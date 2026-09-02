@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     log_dir: Path = Path("./data/logs")
     chroma_dir: Path = Path("./data/chroma")
 
-    ollama_base_url: str = "http://127.0.0.1:11434"
+    log_level: str = "INFO"
+    log_max_bytes: int = 10 * 1024 * 1024
+    log_backup_count: int = 5
+
+    ollama_base_url: str = "http://100.73.210.42:11434"
     ollama_embed_model: str = "bge-m3"
 
     default_chat_provider: str = "ollama"

@@ -14,6 +14,12 @@ from backend.ingestion.worker import (
     ingestion_queue,
     mark_interrupted_ingestions,
 )
+from backend.infrastructure.errors import (
+    register_exception_handlers,
+)
+from backend.infrastructure.logging import (
+    setup_logging,
+)
 from backend.infrastructure.request_id import (
     RequestIdMiddleware,
 )
@@ -43,6 +49,8 @@ async def lifespan(
         parents=True,
         exist_ok=True,
     )
+
+    setup_logging()
 
     await mark_interrupted_ingestions()
 
@@ -76,9 +84,16 @@ app.add_middleware(
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=[
+        "X-Request-ID",
+        "Content-Disposition",
+    ],
 )
 
 
 app.include_router(
     api_router
 )
+
+
+register_exception_handlers(app)

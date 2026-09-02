@@ -1,3 +1,5 @@
+import logging
+from time import perf_counter
 from uuid import uuid4
 
 from starlette.middleware.base import (
@@ -27,12 +29,53 @@ class RequestIdMiddleware(
             request_id
         )
 
-        response = await call_next(
-            request
-        )
+        started_at = perf_counter()
+        status_code = 500
 
-        response.headers[
-            "X-Request-ID"
-        ] = request_id
+        try:
+            response = await call_next(
+                request
+            )
 
-        return response
+            status_code = (
+                response.status_code
+            )
+
+            response.headers[
+                "X-Request-ID"
+            ] = request_id
+
+            return response
+
+        finally:
+            client_host = (
+                request.client.host
+                if request.client
+                else None
+            )
+
+            logging.getLogger(
+                __name__
+            ).info(
+                "HTTP 请求完成",
+                extra={
+                    "request_id":
+                        request_id,
+                    "http_method":
+                        request.method,
+                    "route":
+                        request.url.path,
+                    "status_code":
+                        status_code,
+                    "duration_ms": round(
+                        (
+                            perf_counter()
+                            - started_at
+                        )
+                        * 1000,
+                        2,
+                    ),
+                    "client_host":
+                        client_host,
+                },
+            )

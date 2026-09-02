@@ -8,8 +8,12 @@ import {
 } from "element-plus";
 
 import {
-  API_BASE,
+  formatApiError,
 } from "../api/client";
+
+import {
+  uploadPaper,
+} from "../api/papers";
 
 import {
   usePapersStore,
@@ -21,6 +25,20 @@ const papers =
 
 const uploading =
   ref(false);
+
+const fileInput =
+  ref<HTMLInputElement | null>(
+    null,
+  );
+
+
+function chooseFile() {
+  if (uploading.value) {
+    return;
+  }
+
+  fileInput.value?.click();
+}
 
 
 async function upload(
@@ -47,47 +65,27 @@ async function upload(
     return;
   }
 
-  const form =
-    new FormData();
-
-  form.append(
-    "file",
-    file,
-  );
-
   uploading.value = true;
 
   try {
-    const response =
-      await fetch(
-        `${API_BASE}/api/imports/local`,
-        {
-          method: "POST",
-          body: form,
-        },
-      );
-
-    if (!response.ok) {
-      const body =
-        await response.json();
-
-      throw new Error(
-        body.detail ??
-          "上传失败",
-      );
-    }
+    await uploadPaper(file);
 
     ElMessage.success(
       "论文已加入处理队列",
     );
 
+    papers.q = "";
+    papers.status = "";
+    papers.page = 1;
+
     await papers.load();
 
   } catch (error) {
     ElMessage.error(
-      error instanceof Error
-        ? error.message
-        : "上传失败",
+      formatApiError(
+        error,
+        "上传失败",
+      ),
     );
 
   } finally {
@@ -100,8 +98,9 @@ async function upload(
 
 
 <template>
-  <label>
+  <span>
     <input
+      ref="fileInput"
       type="file"
       accept="application/pdf"
       hidden
@@ -111,9 +110,11 @@ async function upload(
 
     <el-button
       type="primary"
+      native-type="button"
       :loading="uploading"
+      @click="chooseFile"
     >
       上传 PDF
     </el-button>
-  </label>
+  </span>
 </template>

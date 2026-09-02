@@ -1,107 +1,179 @@
 import {
-    defineStore,
-  } from "pinia";
-  
-  import {
-    apiFetch,
-  } from "../api/client";
-  
-  
-  export interface Paper {
-    id: string;
-    title: string;
-    authors: string | null;
-    filename: string;
-    status: string;
-    page_count: number | null;
-    created_at: string;
-  }
-  
-  
-  interface PaperListResponse {
-    items: Paper[];
-    total: number;
-    page: number;
-    page_size: number;
-  }
-  
-  
-  export const usePapersStore =
-    defineStore(
-      "papers",
-      {
-        state: () => ({
-          items: [] as Paper[],
-          loading: false,
-  
-          pollingTimer:
-            null as number | null,
-        }),
-  
-        actions: {
-          async load() {
+  defineStore,
+} from "pinia";
+
+import {
+  deletePaper,
+  listPapers,
+  updatePaper,
+} from "../api/papers";
+
+import type {
+  Paper,
+  PaperUpdate,
+} from "../api/papers";
+
+import {
+  formatApiError,
+} from "../api/client";
+
+
+const ACTIVE_STATUSES = [
+  "queued",
+  "parsing",
+  "embedding",
+];
+
+
+export const usePapersStore =
+  defineStore(
+    "papers",
+    {
+      state: () => ({
+        items: [] as Paper[],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        q: "",
+        status: "",
+        loading: false,
+        loadError: "" as string,
+        pollingTimer:
+          null as number | null,
+      }),
+
+      actions: {
+        async load(
+          silent = false,
+        ) {
+          if (!silent) {
             this.loading = true;
-  
-            try {
-              const result =
-                await apiFetch<
-                  PaperListResponse
-                >(
-                  "/api/papers"
-                  + "?page=1"
-                  + "&page_size=100",
-                );
-  
-              this.items =
-                result.items;
-  
-              this.syncPolling();
-  
-            } finally {
+          }
+
+          try {
+            const result =
+              await listPapers({
+                q: this.q,
+                status: this.status,
+                page: this.page,
+                pageSize:
+                  this.pageSize,
+              });
+
+            this.items = result.items;
+            this.total = result.total;
+            this.loadError = "";
+            this.schedulePolling();
+
+          } catch (error) {
+            this.loadError =
+              formatApiError(
+                error,
+                "论文列表加载失败",
+              );
+
+            this.stopPolling();
+
+            if (!silent) {
+              throw error;
+            }
+
+          } finally {
+            if (!silent) {
               this.loading = false;
             }
-          },
-  
-          syncPolling() {
-            const active =
-              this.items.some(
-                (paper) =>
-                  [
-                    "queued",
-                    "parsing",
-                    "embedding",
-                  ].includes(
-                    paper.status,
-                  ),
-              );
-  
-            if (
-              active
-              && this.pollingTimer
-                === null
-            ) {
-              this.pollingTimer =
-                window.setInterval(
-                  () => {
-                    void this.load();
-                  },
-                  3000,
-                );
-            }
-  
-            if (
-              !active
-              && this.pollingTimer
-                !== null
-            ) {
-              window.clearInterval(
-                this.pollingTimer,
-              );
-  
-              this.pollingTimer =
-                null;
-            }
-          },
+          }
+        },
+
+        async search() {
+          this.page = 1;
+          await this.load();
+        },
+
+        async changePage(
+          page: number,
+        ) {
+          this.page = page;
+          await this.load();
+        },
+
+        async save(
+          paperId: string,
+          payload: PaperUpdate,
+        ) {
+          const paper =
+            await updatePaper(
+              paperId,
+              payload,
+            );
+
+          const index =
+            this.items.findIndex(
+              (item) =>
+                item.id === paperId,
+            );
+
+          if (index >= 0) {
+            this.items[index] = paper;
+          }
+
+          return paper;
+        },
+
+        async remove(
+          paperId: string,
+        ) {
+          await deletePaper(paperId);
+
+          if (
+            this.items.length === 1
+            && this.page > 1
+          ) {
+            this.page -= 1;
+          }
+
+          await this.load();
+        },
+
+        schedulePolling() {
+          this.stopPolling();
+
+          const active =
+            this.items.some(
+              (paper) =>
+                ACTIVE_STATUSES.includes(
+                  paper.status,
+                ),
+            );
+
+          if (!active) {
+            return;
+          }
+
+          this.pollingTimer =
+            window.setTimeout(
+              () => {
+                this.pollingTimer = null;
+                void this.load(true);
+              },
+              3000,
+            );
+        },
+
+        stopPolling() {
+          if (
+            this.pollingTimer
+              === null
+          ) {
+            return;
+          }
+
+          window.clearTimeout(
+            this.pollingTimer,
+          );
+
+          this.pollingTimer = null;
         },
       },
-    );
+    },
+  );

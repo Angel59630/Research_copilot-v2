@@ -7,6 +7,7 @@ from fastapi import (
 from fastapi.responses import (
     FileResponse,
 )
+from uuid import UUID
 from sqlalchemy import (
     func,
     or_,
@@ -135,14 +136,16 @@ async def list_papers(
     response_model=PaperOut,
 )
 async def get_paper(
-    paper_id: str,
+    paper_id: UUID,
     db: AsyncSession = Depends(
         get_session
     ),
 ):
+    paper_id_text = str(paper_id)
+
     paper = await db.get(
         Paper,
-        paper_id,
+        paper_id_text,
     )
 
     if paper is None:
@@ -159,15 +162,17 @@ async def get_paper(
     response_model=PaperOut,
 )
 async def update_paper(
-    paper_id: str,
+    paper_id: UUID,
     payload: PaperUpdate,
     db: AsyncSession = Depends(
         get_session
     ),
 ):
+    paper_id_text = str(paper_id)
+
     paper = await db.get(
         Paper,
-        paper_id,
+        paper_id_text,
     )
 
     if paper is None:
@@ -197,14 +202,16 @@ async def update_paper(
     "/{paper_id}/pdf"
 )
 async def download_pdf(
-    paper_id: str,
+    paper_id: UUID,
     db: AsyncSession = Depends(
         get_session
     ),
 ):
+    paper_id_text = str(paper_id)
+
     paper = await db.get(
         Paper,
-        paper_id,
+        paper_id_text,
     )
 
     if paper is None:
@@ -214,7 +221,7 @@ async def download_pdf(
         )
 
     path = pdf_path(
-        paper_id
+        paper_id_text
     )
 
     if not path.exists():
@@ -235,14 +242,16 @@ async def download_pdf(
     status_code=204,
 )
 async def delete_paper(
-    paper_id: str,
+    paper_id: UUID,
     db: AsyncSession = Depends(
         get_session
     ),
 ):
+    paper_id_text = str(paper_id)
+
     paper = await db.get(
         Paper,
-        paper_id,
+        paper_id_text,
     )
 
     # 幂等删除
@@ -255,11 +264,11 @@ async def delete_paper(
 
     try:
         delete_paper_vectors(
-            paper_id
+            paper_id_text
         )
 
         delete_paper_files(
-            paper_id
+            paper_id_text
         )
 
         await db.delete(
