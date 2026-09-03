@@ -14,6 +14,18 @@
         >
           论文库
         </el-menu-item>
+
+        <el-menu-item
+          index="/groups"
+        >
+          论文分组
+        </el-menu-item>
+
+        <el-menu-item
+          index="/arxiv"
+        >
+          Arxiv 导入
+        </el-menu-item>
       </el-menu>
     </el-aside>
 

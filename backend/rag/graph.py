@@ -21,7 +21,7 @@ from langgraph.prebuilt import (
 )
 
 from backend.rag.prompts import (
-    SYSTEM_PROMPT,
+    build_system_prompt,
 )
 from backend.rag.retrieval import (
     retrieve_papers,
@@ -43,15 +43,19 @@ class AgentState(TypedDict):
 
 def build_rag_graph(
     model,
+    *,
+    context: RagRuntimeContext,
 ):
     tools = [
-        retrieve_papers
+        retrieve_papers,
     ]
 
-    tool_model = (
-        model.bind_tools(
-            tools
-        )
+    tool_model = model.bind_tools(
+        tools
+    )
+
+    system_prompt = build_system_prompt(
+        context
     )
 
     async def agent_decide(
@@ -59,7 +63,7 @@ def build_rag_graph(
     ):
         messages = [
             SystemMessage(
-                content=SYSTEM_PROMPT
+                content=system_prompt,
             ),
             *state["messages"],
         ]
@@ -72,8 +76,8 @@ def build_rag_graph(
 
         return {
             "messages": [
-                response
-            ]
+                response,
+            ],
         }
 
     def route_agent(
@@ -90,11 +94,9 @@ def build_rag_graph(
             )
             and message.tool_calls
         ):
-            call_count = (
-                state.get(
-                    "tool_call_count",
-                    0,
-                )
+            call_count = state.get(
+                "tool_call_count",
+                0,
             )
 
             if (
@@ -117,7 +119,7 @@ def build_rag_graph(
 
         return {
             "tool_call_count":
-                current + 1
+                current + 1,
         }
 
     async def direct_answer(
@@ -134,9 +136,9 @@ def build_rag_graph(
                     content=(
                         "当前论文检索结果不足以"
                         "支持可靠回答。"
-                    )
-                )
-            ]
+                    ),
+                ),
+            ],
         }
 
     graph = StateGraph(
@@ -182,8 +184,10 @@ def build_rag_graph(
         {
             "tools":
                 "tools",
+
             "direct":
                 "direct",
+
             "insufficient":
                 "insufficient",
         },

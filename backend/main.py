@@ -23,6 +23,9 @@ from backend.infrastructure.logging import (
 from backend.infrastructure.request_id import (
     RequestIdMiddleware,
 )
+from backend.infrastructure.arxiv_mcp import (
+    arxiv_mcp,
+)
 from config import settings
 
 
@@ -56,10 +59,14 @@ async def lifespan(
 
     await ingestion_queue.start()
 
+    await arxiv_mcp.start()
+
     try:
         yield
 
     finally:
+        await arxiv_mcp.stop()
+
         await ingestion_queue.stop()
 
 

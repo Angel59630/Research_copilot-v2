@@ -1,11 +1,20 @@
 import asyncio
+import inspect
 import json
+import logging
+
 from collections.abc import (
     AsyncIterator,
+    Callable,
 )
 
 from backend.rag.types import (
     RagRuntimeContext,
+)
+
+
+logger = logging.getLogger(
+    __name__
 )
 
 
@@ -37,6 +46,21 @@ async def stream_graph(
     graph,
     input_state,
     context: RagRuntimeContext,
+
+    on_delta:
+        Callable[
+            [str],
+            object,
+        ]
+        | None = None,
+
+    on_done:
+        Callable[
+            [],
+            object,
+        ]
+        | None = None,
+
 ) -> AsyncIterator[bytes]:
     yield sse_event(
         "meta",
@@ -132,6 +156,11 @@ async def stream_graph(
                     )
                     and content
                 ):
+                    await _run_hook(
+                        on_delta,
+                        content,
+                    )
+
                     yield sse_event(
                         "delta",
                         {
@@ -139,6 +168,10 @@ async def stream_graph(
                                 content
                         },
                     )
+
+        await _run_hook(
+            on_done
+        )
 
         yield sse_event(
             "done",
@@ -159,11 +192,36 @@ async def stream_graph(
 
         raise
 
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "RAG generation failed"
+        )
+
         yield sse_event(
             "failure",
             {
-                "message":
-                    "生成回答失败"
+                "message": (
+                    "生成回答失败: "
+                    f"{type(exc).__name__}: "
+                    f"{exc}"
+                )
             },
         )
+
+
+async def _run_hook(
+    hook: Callable | None,
+    *args,
+) -> None:
+
+    if hook is None:
+        return
+
+    result = hook(
+        *args
+    )
+
+    if inspect.isawaitable(
+        result
+    ):
+        await result

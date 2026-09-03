@@ -12,36 +12,56 @@ def create_chat_model(
     provider: str,
     model: str,
 ):
-    if provider == "ollama":
+    model_config = (
+        settings.get_chat_model_config(
+            provider,
+            model,
+        )
+    )
+
+    model_url = str(
+        model_config.chat_model_url
+    ).rstrip("/")
+
+    if (
+        model_config
+        .chat_model_provider
+        == "ollama"
+    ):
         return ChatOllama(
-            model=model,
-            base_url=(
-                settings.ollama_base_url
+            model=(
+                model_config
+                .chat_model_name
             ),
+            base_url=model_url,
             temperature=0,
         )
 
-    if provider == "deepseek":
-        if not (
-            settings.deepseek_api_key
-        ):
-            raise RuntimeError(
-                "DEEPSEEK_API_KEY "
-                "未配置"
+    if (
+        model_config
+        .chat_model_provider
+        == "deepseek"
+    ):
+        api_key = (
+            settings.resolve_api_key()
+        )
+
+        if not api_key:
+            raise ValueError(
+                "API_KEY 未配置，无法使用 "
+                "DeepSeek 聊天模型"
             )
 
         return ChatOpenAI(
-            model=model,
-            api_key=(
-                settings.deepseek_api_key
+            model=(
+                model_config
+                .chat_model_name
             ),
-            base_url=(
-                settings.deepseek_base_url
-            ),
+            api_key=api_key,
+            base_url=model_url,
             temperature=0,
         )
 
     raise ValueError(
-        "Unsupported provider: "
-        f"{provider}"
+        "不支持的聊天模型提供方"
     )

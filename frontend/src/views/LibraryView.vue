@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import {
+  useRouter,
+} from "vue-router";
+
+import {
   onMounted,
   onUnmounted,
   reactive,
@@ -67,6 +71,9 @@ const statusLabels:
     delete_failed: "删除失败",
   };
 
+const router =
+  useRouter();
+
 
 function statusLabel(
   status: string,
@@ -104,6 +111,19 @@ function sourceLabel(
   return source === "local"
     ? "本地上传"
     : source;
+}
+
+
+function openChat(
+  paper: Paper,
+) {
+  router.push(
+    `/chat/paper/${
+      encodeURIComponent(
+        paper.id,
+      )
+    }`,
+  );
 }
 
 
@@ -483,6 +503,22 @@ onUnmounted(
         fixed="right"
       >
         <template #default="scope">
+          <el-button
+            link
+            type="primary"
+            :disabled="
+              scope.row.status
+                !== 'ready'
+            "
+            @click="
+              openChat(
+                scope.row
+              )
+            "
+          >
+            问答
+          </el-button>
+          
           <el-button
             link
             type="primary"
